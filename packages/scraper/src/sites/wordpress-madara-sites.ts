@@ -6,7 +6,7 @@
  * from the stock Madara theme defaults.
  *
  * Extracted from HakuNeko's WordPressMadara site definitions.
- * 88 total sites across multiple languages.
+ * 87 total sites across multiple languages.
  */
 import type { WPMadaraSiteConfig } from '../templates/types.js';
 
@@ -98,7 +98,7 @@ export const wpMadaraSites: WPMadaraSiteConfig[] = [
   {
     id: 'coffeemanga',
     label: 'Coffee Manga',
-    url: 'https://coffeemanga.io',
+    url: 'https://coffeemanga.ink',
     language: 'en',
   },
   {

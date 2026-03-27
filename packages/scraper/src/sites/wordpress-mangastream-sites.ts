@@ -11,31 +11,14 @@
 import type { WPMangastreamSiteConfig } from '../templates/types.js';
 
 export const wpMangastreamSites: WPMangastreamSiteConfig[] = [
-  // ─── Asura Scans ─────────────────────────────────────────────────
-  // One of the largest English webtoon scan groups.
-  // Changes domains frequently — update url as needed.
-  {
-    id: 'asurascans',
-    label: 'Asura Scans',
-    url: 'https://asurascanscomic.net',
-    path: '/manga/list-mode/',
-    queryPages: 'div#readerarea p img, div#readerarea img[src]:not([src=""])',
-    pageExcludes: [
-      /panda_gif_large/i,
-      /ENDING-PAGE/i,
-      /EndDesignPSD/i,
-    ],
-    headers: {
-      'x-user-agent':
-        'Mozilla/5.0 (Linux; Android 9; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4026.0 Mobile Safari/537.36',
-    },
-  },
+  // NOTE: Asura Scans removed — they migrated to Jannah theme (no longer Mangastream).
+  // Would need a dedicated Jannah connector if re-added.
 
   // ─── Luminous Scans ──────────────────────────────────────────────
   {
     id: 'luminousscans',
     label: 'Luminous Scans',
-    url: 'https://luminousscans.gg',
+    url: 'https://luminousscans.com',
     path: '/series/list-mode/',
     queryChapters: 'div#chapterlist ul li a',
     pageExcludes: [/\/NovelBanner[^.]+\.(png|jpeg|jpg|gif)$/i],
