@@ -92,8 +92,18 @@ import { MangaSeeConnector } from './connectors/mangasee.js';
 import { MangaKakalotConnector } from './connectors/mangakakalot.js';
 import { WPMangastreamConnector } from './templates/wordpress-mangastream.js';
 import { WPMadaraConnector } from './templates/wordpress-madara.js';
+import { FoolSlideConnector } from './templates/foolslide.js';
+import { MadThemeConnector } from './templates/madtheme.js';
+import { MangaReaderCMSConnector } from './templates/mangareadercms.js';
+import { FlatMangaConnector } from './templates/flatmanga.js';
+import { GenkanConnector } from './templates/genkan.js';
 import { wpMangastreamSites } from './sites/wordpress-mangastream-sites.js';
 import { wpMadaraSites } from './sites/wordpress-madara-sites.js';
+import { foolSlideSites } from './sites/foolslide-sites.js';
+import { madThemeSites } from './sites/madtheme-sites.js';
+import { mangaReaderCMSSites } from './sites/mangareadercms-sites.js';
+import { flatMangaSites } from './sites/flatmanga-sites.js';
+import { genkanSites } from './sites/genkan-sites.js';
 
 export const engine = new ScraperEngine();
 
@@ -112,6 +122,31 @@ for (const site of wpMadaraSites) {
   engine.register(new WPMadaraConnector(site));
 }
 
+// Register all FoolSlide template sites
+for (const site of foolSlideSites) {
+  engine.register(new FoolSlideConnector(site));
+}
+
+// Register all MadTheme template sites
+for (const site of madThemeSites) {
+  engine.register(new MadThemeConnector(site));
+}
+
+// Register all MangaReaderCMS template sites
+for (const site of mangaReaderCMSSites) {
+  engine.register(new MangaReaderCMSConnector(site));
+}
+
+// Register all FlatManga template sites
+for (const site of flatMangaSites) {
+  engine.register(new FlatMangaConnector(site));
+}
+
+// Register all Genkan template sites
+for (const site of genkanSites) {
+  engine.register(new GenkanConnector(site));
+}
+
 // Re-export connectors and templates
 export { MangaDexConnector } from './connectors/mangadex.js';
 export { MangaSeeConnector } from './connectors/mangasee.js';
@@ -119,4 +154,17 @@ export { MangaKakalotConnector } from './connectors/mangakakalot.js';
 export { BaseConnector } from './engine/base-connector.js';
 export { WPMangastreamConnector } from './templates/wordpress-mangastream.js';
 export { WPMadaraConnector } from './templates/wordpress-madara.js';
-export type { WPMangastreamSiteConfig, WPMadaraSiteConfig } from './templates/types.js';
+export { FoolSlideConnector } from './templates/foolslide.js';
+export { MadThemeConnector } from './templates/madtheme.js';
+export { MangaReaderCMSConnector } from './templates/mangareadercms.js';
+export { FlatMangaConnector } from './templates/flatmanga.js';
+export { GenkanConnector } from './templates/genkan.js';
+export type {
+  WPMangastreamSiteConfig,
+  WPMadaraSiteConfig,
+  FoolSlideSiteConfig,
+  MadThemeSiteConfig,
+  MangaReaderCMSSiteConfig,
+  FlatMangaSiteConfig,
+  GenkanSiteConfig,
+} from './templates/types.js';

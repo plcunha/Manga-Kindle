@@ -154,3 +154,118 @@ export interface WPMadaraSiteConfig extends BaseSiteConfig {
    */
   postsPerPage?: number;
 }
+
+/**
+ * Config for FoolSlide-based sites.
+ *
+ * FoolSlide is a self-hosted manga reader used by many scanlation groups.
+ * Pages are extracted from embedded JS variables (pages = [...] or base64-encoded).
+ */
+export interface FoolSlideSiteConfig extends BaseSiteConfig {
+  /** Directory path for manga list (default: '/directory/') */
+  path?: string;
+  /** CSS selector for manga links on the directory page */
+  queryMangas?: string;
+  /** CSS selector for pagination "next" link to detect page count */
+  queryMangasPageCount?: string;
+  /** CSS selector for chapter links on the manga page */
+  queryChapters?: string;
+  /** Custom headers */
+  headers?: Record<string, string>;
+}
+
+/**
+ * Config for FlatManga-based sites.
+ *
+ * FlatManga sites use a flat AZ listing, chapter tables, and
+ * base64-encoded image attributes with multiple fallback sources.
+ */
+export interface FlatMangaSiteConfig extends BaseSiteConfig {
+  /** Manga list path (default: '/manga-list.html?listType=allABC') */
+  path?: string;
+  /** CSS selector for manga links */
+  queryMangas?: string;
+  /** CSS selector for chapter links */
+  queryChapters?: string;
+  /** CSS selector for page images */
+  queryPages?: string;
+  /** CSS selector for manga title on detail page */
+  queryMangaTitle?: string;
+  /** CSS selector for cover image */
+  queryCover?: string;
+  /** CSS selector for synopsis */
+  querySynopsis?: string;
+  /** Custom headers */
+  headers?: Record<string, string>;
+}
+
+/**
+ * Config for MadTheme-based sites.
+ *
+ * MadTheme is a manga CMS used by sites like MangaBuddy, MangaForest, etc.
+ * Pages are extracted from window.chapImages + window.mainServer JS variables.
+ */
+export interface MadThemeSiteConfig extends BaseSiteConfig {
+  /** AZ list path (default: '/az-list') */
+  path?: string;
+  /** CSS selector for manga links on the list page */
+  queryMangas?: string;
+  /** CSS selector for manga title on detail page */
+  queryMangaTitle?: string;
+  /** CSS selector for chapter title inside chapter list */
+  queryChapterTitle?: string;
+  /** CSS selector for cover image on manga detail page */
+  queryCover?: string;
+  /** CSS selector for synopsis */
+  querySynopsis?: string;
+  /** Custom headers */
+  headers?: Record<string, string>;
+}
+
+/**
+ * Config for MangaReaderCMS-based sites.
+ *
+ * MangaReaderCMS sites serve manga lists via AJAX changeMangaList endpoint
+ * and use base64-encoded or direct image sources for pages.
+ */
+export interface MangaReaderCMSSiteConfig extends BaseSiteConfig {
+  /** Path prefix (default: '/') */
+  path?: string;
+  /** CSS selector for manga list links */
+  queryMangas?: string;
+  /** CSS selector for chapter elements */
+  queryChapters?: string;
+  /** CSS selector for page images */
+  queryPages?: string;
+  /** CSS selector for manga title */
+  queryMangaTitle?: string;
+  /** CSS selector for cover image on manga detail page */
+  queryCover?: string;
+  /** CSS selector for synopsis */
+  querySynopsis?: string;
+  /** Custom headers */
+  headers?: Record<string, string>;
+}
+
+/**
+ * Config for Genkan-based sites.
+ *
+ * Genkan is a manga CMS with paginated comic listings and
+ * page URLs extracted from the chapterPages JS variable.
+ */
+export interface GenkanSiteConfig extends BaseSiteConfig {
+  /** Comics list path (default: '/comics') */
+  path?: string;
+  /** CSS selector for manga links on list page */
+  queryMangas?: string;
+  /** CSS selector for pagination links */
+  queryPagination?: string;
+  /** CSS selector for chapter items on manga page */
+  queryChapters?: string;
+  /** CSS selector for chapter link inside each chapter item */
+  queryChapterLink?: string;
+  /** CSS selector for chapter number text */
+  queryChapterNumber?: string;
+  /** Custom headers */
+  headers?: Record<string, string>;
+}
