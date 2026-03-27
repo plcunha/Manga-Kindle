@@ -91,7 +91,9 @@ import { MangaDexConnector } from './connectors/mangadex.js';
 import { MangaSeeConnector } from './connectors/mangasee.js';
 import { MangaKakalotConnector } from './connectors/mangakakalot.js';
 import { WPMangastreamConnector } from './templates/wordpress-mangastream.js';
+import { WPMadaraConnector } from './templates/wordpress-madara.js';
 import { wpMangastreamSites } from './sites/wordpress-mangastream-sites.js';
+import { wpMadaraSites } from './sites/wordpress-madara-sites.js';
 
 export const engine = new ScraperEngine();
 
@@ -105,10 +107,16 @@ for (const site of wpMangastreamSites) {
   engine.register(new WPMangastreamConnector(site));
 }
 
+// Register all WordPressMadara template sites
+for (const site of wpMadaraSites) {
+  engine.register(new WPMadaraConnector(site));
+}
+
 // Re-export connectors and templates
 export { MangaDexConnector } from './connectors/mangadex.js';
 export { MangaSeeConnector } from './connectors/mangasee.js';
 export { MangaKakalotConnector } from './connectors/mangakakalot.js';
 export { BaseConnector } from './engine/base-connector.js';
 export { WPMangastreamConnector } from './templates/wordpress-mangastream.js';
-export type { WPMangastreamSiteConfig } from './templates/types.js';
+export { WPMadaraConnector } from './templates/wordpress-madara.js';
+export type { WPMangastreamSiteConfig, WPMadaraSiteConfig } from './templates/types.js';
