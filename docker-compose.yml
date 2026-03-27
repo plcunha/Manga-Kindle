@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  manga-kindle:
+    build: .
+    container_name: manga-kindle
+    ports:
+      - "3000:3000"   # Web UI
+      - "3001:3001"   # API
+    volumes:
+      - manga-data:/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=file:/data/manga-kindle.db
+      - DOWNLOAD_DIR=/data/downloads
+      - CONVERTED_DIR=/data/converted
+      - TEMP_DIR=/data/temp
+      - KCC_PATH=/usr/bin/kcc-c2e
+      - KCC_DEVICE_PROFILE=KPW5
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    restart: unless-stopped
+
+volumes:
+  manga-data:
+    driver: local

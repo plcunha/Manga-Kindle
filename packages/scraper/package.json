@@ -1,0 +1,22 @@
+{
+  "name": "@manga-kindle/scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "echo \"no tests yet\""
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "undici": "^6.18.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "tsx": "^4.11.2",
+    "typescript": "^5.4.5"
+  }
+}

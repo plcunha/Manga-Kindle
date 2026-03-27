@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// --- Manga/Anime Source ---
+model Source {
+  id        String   @id @default(cuid())
+  name      String
+  url       String   @unique
+  language  String   @default("en")
+  type      String   @default("manga") // manga | anime | both
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mangas Manga[]
+}
+
+// --- Manga/Anime Title ---
+model Manga {
+  id        String   @id @default(cuid())
+  sourceId  String
+  title     String
+  url       String
+  cover     String?
+  synopsis  String?
+  authors   String?  // JSON array stored as string (SQLite limitation)
+  genres    String?  // JSON array stored as string
+  status    String   @default("unknown") // ongoing | completed | hiatus | unknown
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  source   Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  chapters Chapter[]
+  downloads DownloadJob[]
+
+  @@unique([sourceId, url])
+  @@index([title])
+}
+
+// --- Chapter ---
+model Chapter {
+  id        String   @id @default(cuid())
+  mangaId   String
+  title     String
+  number    Float    @default(0)
+  language  String   @default("en")
+  url       String
+  date      String?
+  createdAt DateTime @default(now())
+
+  manga    Manga     @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+
+  @@unique([mangaId, url])
+  @@index([mangaId, number])
+}
+
+// --- Download Job ---
+model DownloadJob {
+  id          String   @id @default(cuid())
+  mangaId     String
+  sourceId    String
+  chapterIds  String   // JSON array of chapter IDs
+  status      String   @default("queued") // queued | downloading | completed | failed | cancelled
+  progress    Float    @default(0) // 0-100
+  outputPath  String?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  manga       Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+  conversions ConversionJob[]
+
+  @@index([status])
+}
+
+// --- Conversion Job (KCC) ---
+model ConversionJob {
+  id            String   @id @default(cuid())
+  downloadJobId String
+  format        String   @default("EPUB") // EPUB | MOBI | AZW3 | CBZ | PDF
+  deviceProfile String   @default("KPW5")
+  status        String   @default("queued") // queued | converting | completed | failed | cancelled
+  progress      Float    @default(0)
+  outputPath    String?
+  error         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  downloadJob   DownloadJob @relation(fields: [downloadJobId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// --- User Preferences ---
+model UserPreference {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
