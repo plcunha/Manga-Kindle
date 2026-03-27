@@ -20,8 +20,11 @@ export const wpMadaraSites: WPMadaraSiteConfig[] = [
     label: 'Toonily',
     url: 'https://toonily.com',
     language: 'en',
-    // Custom: has queryTitleForURI override + cookie in HakuNeko
     queryTitleForURI: 'head meta[property="og:title"]',
+    headers: {
+      Referer: 'https://toonily.com/',
+      Cookie: 'toonily-mature=1',
+    },
   },
   {
     id: 'hiperdex',
