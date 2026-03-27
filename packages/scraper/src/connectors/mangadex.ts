@@ -73,10 +73,16 @@ export class MangaDexConnector extends BaseConnector {
       }>(`${API_BASE}/manga/${mangaId}?${params}`);
 
       return this.mapManga(data.data);
-    } catch {
-      return null;
+    } catch (err: unknown) {
+      // Only treat 404 as "not found"; re-throw network/rate-limit/5xx errors
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('404') || msg.includes('Not Found')) return null;
+      throw err;
     }
   }
+
+  /** Languages to fetch chapters for (order = preference for dedup) */
+  static readonly LANGUAGES = ['pt-br', 'pt', 'en', 'es-la', 'es'];
 
   async getChapters(mangaId: string): Promise<ChapterInfo[]> {
     const chapters: ChapterInfo[] = [];
@@ -88,10 +94,13 @@ export class MangaDexConnector extends BaseConnector {
       const params = new URLSearchParams({
         limit: String(limit),
         offset: String(offset),
-        'translatedLanguage[]': 'en',
         'order[chapter]': 'asc',
         includeExternalUrl: '0',
       });
+      // Request multiple languages
+      for (const lang of MangaDexConnector.LANGUAGES) {
+        params.append('translatedLanguage[]', lang);
+      }
 
       const data = await this.fetchJSON<{
         data: { id: string; attributes: MdChapterAttributes }[];
@@ -151,16 +160,23 @@ export class MangaDexConnector extends BaseConnector {
   }): MangaInfo {
     const attrs = manga.attributes;
 
-    // Get title (prefer English, fallback to first available)
+    // Get title (prefer PT, then EN, then romanised Japanese, then first available)
     const title =
+      attrs.title['pt-br'] ||
+      attrs.title['pt'] ||
       attrs.title['en'] ||
       attrs.title['ja-ro'] ||
       attrs.title['ja'] ||
       Object.values(attrs.title)[0] ||
       'Unknown';
 
-    // Get synopsis
-    const synopsis = attrs.description?.['en'] || attrs.description?.['ja-ro'] || undefined;
+    // Get synopsis (prefer PT, then EN)
+    const synopsis =
+      attrs.description?.['pt-br'] ||
+      attrs.description?.['pt'] ||
+      attrs.description?.['en'] ||
+      attrs.description?.['ja-ro'] ||
+      undefined;
 
     // Get cover URL
     const coverRel = manga.relationships.find((r) => r.type === 'cover_art');

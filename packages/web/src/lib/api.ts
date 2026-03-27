@@ -10,7 +10,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || `API error: ${res.status}`);
+    throw new Error(body.error || body.message || `API error: ${res.status}`);
   }
   return res.json();
 }
@@ -23,6 +23,7 @@ export interface Source {
   url: string;
   language: string;
   nsfw: boolean;
+  cloudflareProtected: boolean;
 }
 
 export interface MangaInfo {

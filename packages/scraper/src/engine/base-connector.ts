@@ -84,17 +84,31 @@ export abstract class BaseConnector implements Connector {
 
   /**
    * Fetch JSON from a URL.
+   * Like fetchText, applies cached CF cookies and falls back to FlareSolverr
+   * on 403/503 responses (solves for cookies, then retries the JSON request).
    */
   protected async fetchJSON<T = unknown>(url: string, init?: RequestInit): Promise<T> {
+    const cached = this.getCachedCFCookies(url);
+    const extraHeaders: Record<string, string> = {};
+    if (cached) {
+      extraHeaders.Cookie = cached.cookies;
+      extraHeaders['User-Agent'] = cached.userAgent;
+    }
+
     const response = await fetch(url, {
       ...init,
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        ...this.defaultHeaders,
         Accept: 'application/json',
+        ...extraHeaders,
         ...(init?.headers as Record<string, string>),
       },
     });
+
+    // If blocked by Cloudflare, solve for cookies then retry
+    if (CF_STATUS_CODES.has(response.status)) {
+      return this.fetchJSONViaCF<T>(url, init);
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} fetching ${url}`);
@@ -130,6 +144,45 @@ export abstract class BaseConnector implements Connector {
     this.cacheCFCookies(url, result.cookies, result.userAgent);
 
     return result.html;
+  }
+
+  /**
+   * Fetch JSON via FlareSolverr for Cloudflare-protected endpoints.
+   * Unlike fetchTextViaCF, we can't use the HTML response from FlareSolverr
+   * as JSON. Instead, we solve to obtain cookies, then retry the original
+   * JSON request with those cookies injected.
+   */
+  private async fetchJSONViaCF<T = unknown>(url: string, init?: RequestInit): Promise<T> {
+    if (!getFlareSolverrUrl()) {
+      throw new Error(
+        `HTTP 403/503 fetching ${url}. Site appears to be Cloudflare-protected. ` +
+        `Set FLARESOLVERR_URL env var to enable automatic bypass.`,
+      );
+    }
+
+    const result = await solveCloudflarePage(url);
+
+    // Cache cookies for this domain
+    this.cacheCFCookies(url, result.cookies, result.userAgent);
+
+    // Retry the JSON request with the freshly obtained cookies
+    const cookieStr = result.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        ...this.defaultHeaders,
+        Accept: 'application/json',
+        Cookie: cookieStr,
+        'User-Agent': result.userAgent,
+        ...(init?.headers as Record<string, string>),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} fetching ${url} (after FlareSolverr solve)`);
+    }
+
+    return response.json() as Promise<T>;
   }
 
   /**

@@ -14,6 +14,8 @@ export interface Source {
   language: string;
   type: 'manga' | 'anime' | 'both';
   enabled: boolean;
+  /** Hint: site is known to use Cloudflare protection (needs FlareSolverr) */
+  cloudflareProtected?: boolean;
 }
 
 export interface MangaInfo {

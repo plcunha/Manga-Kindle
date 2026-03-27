@@ -12,6 +12,7 @@ function mapSource(s: Source) {
     url: s.url,
     language: s.language,
     nsfw: false,
+    cloudflareProtected: s.cloudflareProtected ?? false,
   };
 }
 

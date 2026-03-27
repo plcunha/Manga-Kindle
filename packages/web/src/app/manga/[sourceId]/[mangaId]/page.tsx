@@ -128,10 +128,17 @@ export default function MangaDetailPage() {
 
       {/* Chapters */}
       <h2 className="mb-4 text-lg font-semibold">
-        Chapters ({chapters.length})
+        Chapters ({chapters.length}){" "}
+        {chapters.length === 0 && (
+          <span className="text-sm font-normal text-gray-500">
+            &mdash; no chapters found for this manga
+          </span>
+        )}
       </h2>
       <ChapterList
         chapters={chapters}
+        sourceId={sourceId}
+        mangaId={mangaId}
         onDownload={handleDownload}
         downloading={downloading}
       />

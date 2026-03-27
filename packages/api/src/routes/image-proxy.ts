@@ -36,6 +36,7 @@ const ALLOWED_DOMAINS = [
   'official-ongoing-2.gcdn.co',
   // MangaDex CDNs
   'uploads.mangadex.org',
+  'mangadex.network',        // at-home CDN (e.g. cmdxd98sb0x3yprd.mangadex.network)
 ];
 
 function isDomainAllowed(hostname: string): boolean {

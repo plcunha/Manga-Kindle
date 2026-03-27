@@ -3,6 +3,44 @@ import { engine } from '@manga-kindle/scraper';
 import type { MangaInfo, ChapterInfo, PageInfo } from '@manga-kindle/scraper';
 import { AppError } from '../middleware/error-handler.js';
 
+/** Detect Cloudflare-related errors and rethrow as a user-friendly AppError */
+function handleConnectorError(err: unknown, sourceId: string): never {
+  if (err instanceof AppError) throw err;
+
+  const msg = err instanceof Error ? err.message : String(err);
+
+  // Cloudflare block (403/503 without FlareSolverr)
+  if (msg.includes('403/503') || msg.includes('Cloudflare-protected')) {
+    throw new AppError(
+      503,
+      `Source "${sourceId}" is protected by Cloudflare and requires FlareSolverr to work. ` +
+      `Set the FLARESOLVERR_URL environment variable to enable automatic bypass.`,
+      'CLOUDFLARE_PROTECTED',
+    );
+  }
+
+  // Generic HTTP errors from connectors
+  const httpMatch = msg.match(/^HTTP (\d+)/);
+  if (httpMatch) {
+    const status = parseInt(httpMatch[1], 10);
+    throw new AppError(
+      status >= 400 && status < 600 ? status : 502,
+      `Source "${sourceId}" returned HTTP ${httpMatch[1]}. The site may be down or blocking requests.`,
+    );
+  }
+
+  // Network / DNS / timeout errors
+  if (msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT') || msg.includes('fetch failed')) {
+    throw new AppError(
+      502,
+      `Source "${sourceId}" is unreachable. The site may be down.`,
+    );
+  }
+
+  // Unknown connector error — still surface the message
+  throw new AppError(500, `Source "${sourceId}" error: ${msg}`);
+}
+
 export const mangaRouter = Router();
 
 // ── Mappers: scraper types → web-friendly response shapes ──
@@ -49,8 +87,10 @@ function mapChapter(ch: ChapterInfo) {
 }
 
 function mapPage(p: PageInfo) {
+  // Always proxy page images so the browser can load them (CORS)
+  const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(p.url)}`;
   return {
-    url: p.url,
+    url: proxyUrl,
     headers: p.referer ? { Referer: p.referer } : undefined,
   };
 }
@@ -72,8 +112,12 @@ mangaRouter.get('/search', async (req, res) => {
     throw new AppError(404, `Source "${sourceId}" not found`);
   }
 
-  const results = await connector.search(query);
-  res.json({ results: results.map(mapManga), query, source: sourceId });
+  try {
+    const results = await connector.search(query);
+    res.json({ results: results.map(mapManga), query, source: sourceId });
+  } catch (err) {
+    handleConnectorError(err, sourceId);
+  }
 });
 
 // GET /api/manga/:sourceId/:mangaId - Get manga details + chapters
@@ -85,16 +129,20 @@ mangaRouter.get('/:sourceId/:mangaId', async (req, res) => {
     throw new AppError(404, `Source "${sourceId}" not found`);
   }
 
-  const [manga, chapters] = await Promise.all([
-    connector.getManga(mangaId),
-    connector.getChapters(mangaId),
-  ]);
+  try {
+    const [manga, chapters] = await Promise.all([
+      connector.getManga(mangaId),
+      connector.getChapters(mangaId),
+    ]);
 
-  if (!manga) {
-    throw new AppError(404, `Manga "${mangaId}" not found on source "${sourceId}"`);
+    if (!manga) {
+      throw new AppError(404, `Manga "${mangaId}" not found on source "${sourceId}"`);
+    }
+
+    res.json({ manga: mapManga(manga), chapters: chapters.map(mapChapter) });
+  } catch (err) {
+    handleConnectorError(err, sourceId);
   }
-
-  res.json({ manga: mapManga(manga), chapters: chapters.map(mapChapter) });
 });
 
 // GET /api/manga/:sourceId/:mangaId/:chapterId/pages - Get chapter pages
@@ -106,6 +154,10 @@ mangaRouter.get('/:sourceId/:mangaId/:chapterId/pages', async (req, res) => {
     throw new AppError(404, `Source "${sourceId}" not found`);
   }
 
-  const pages = await connector.getPages(chapterId);
-  res.json({ pages: pages.map(mapPage) });
+  try {
+    const pages = await connector.getPages(chapterId);
+    res.json({ pages: pages.map(mapPage) });
+  } catch (err) {
+    handleConnectorError(err, sourceId);
+  }
 });

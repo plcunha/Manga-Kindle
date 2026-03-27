@@ -1,85 +1,55 @@
-# 🛡️ Guia de Configuração do FlareSolverr
+# Guia de Configuracao do FlareSolverr
 
 ## Problema: Erros HTTP 403/503 (Cloudflare)
 
-Se você está vendo erros como:
+Se voce esta vendo erros como:
 
 ```
-[ERROR] Error: HTTP 403/503 fetching https://pt.ninemanga.com/...
-Site appears to be Cloudflare-protected. 
+[ERROR] Error: HTTP 403/503 fetching https://mangakakalot.com/...
+Site appears to be Cloudflare-protected.
 Set FLARESOLVERR_URL env var to enable automatic bypass.
 ```
 
-Isso significa que o site usa **proteção Cloudflare DDoS-GUARD** e requer um navegador real para resolver o desafio JavaScript.
+Isso significa que o site usa **protecao Cloudflare** e requer um navegador real para resolver o desafio JavaScript.
 
 ---
 
-## O Que é Cloudflare?
+## Como Funciona no Manga-Kindle
 
-Cloudflare é um serviço de proteção DDoS que:
-1. **Desafia requisições suspeitas** (bots, scripts, servidores)
-2. **Executa JavaScript** no navegador do cliente
-3. **Valida cookies** antes de permitir acesso
-4. **Retorna 403/503** se o desafio falhar
+O sistema de bypass e **completamente automatico**:
 
-### Por Que Nosso Scraper Falha?
+```
+Scraper faz request HTTP
+    ↓
+Recebe 403 ou 503?
+    ├── Nao → Retorna resposta normalmente
+    └── Sim → Tem cookies CF cacheados para esse dominio?
+                ├── Sim → Refaz request com cookies cacheados
+                └── Nao → FlareSolverr configurado?
+                            ├── Sim → Resolve via FlareSolverr → Cache cookies (15 min) → Retorna HTML
+                            └── Nao → Lanca erro com instrucoes de setup
+```
 
-Nosso scraper usa `undici` (fetch HTTP) que:
-- ❌ Não executa JavaScript
-- ❌ Não tem navegador real
-- ❌ Não resolve desafios Cloudflare
+**Todos os 134 conectores** herdam esse comportamento automaticamente via `BaseConnector`. Nenhum conector precisa implementar logica de Cloudflare.
 
-### Como o HakuNeko Resolve?
+### Codigo Relevante
 
-O HakuNeko usa **navegador embutido** (Electron/Chrome) que:
-- ✅ Executa JavaScript normalmente
-- ✅ Resolve desafios automaticamente
-- ✅ Mantém cookies válidos
+- **Deteccao e fallback:** `packages/scraper/src/engine/base-connector.ts`
+  - `fetchText()` — detecta 403/503, injeta cookies cacheados, chama FlareSolverr
+  - `fetchJSON()` — mesmo comportamento para respostas JSON
+  - Cookie cache estatico por dominio com TTL de 15 minutos
+
+- **Cliente FlareSolverr:** `packages/scraper/src/engine/flaresolverr.ts`
+  - `solveCloudflarePage(url)` — POST para FlareSolverr, retorna HTML + cookies + userAgent
+  - `isFlareSolverrAvailable()` — verifica se URL esta configurada
 
 ---
 
-## Solução: FlareSolverr
+## Instalacao
 
-**FlareSolverr** é um proxy que:
-1. Inicia um navegador Chrome headless
-2. Abre a URL protegida
-3. Espera o desafio Cloudflare ser resolvido
-4. Retorna HTML + cookies válidos
+### Opcao 1: Docker Compose (Recomendado)
 
-### Arquitetura
-
-```
-┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│  Manga-Kindle   │ ───► │  FlareSolverr    │ ───► │  Site (CF)      │
-│  Scraper        │      │  (Chrome)        │      │  ninemanga.com  │
-└─────────────────┘      └──────────────────┘      └─────────────────┘
-     HTTP Request            Cloudflare                  Protected
-     (undici)                Bypass                      Site
-```
-
----
-
-## Instalação (Recomendado: Docker)
-
-### 1. Instalar Docker
-
-**Windows:**
-```powershell
-# Baixe Docker Desktop
-https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe
-```
-
-**Linux (Debian/Ubuntu):**
-```bash
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-```
-
-### 2. Rodar FlareSolverr
-
-**Docker Compose (Recomendado):**
-
-Já configurado no `docker-compose.yml`:
+Ja configurado no `docker-compose.yml`:
 
 ```yaml
 services:
@@ -94,12 +64,16 @@ services:
     restart: unless-stopped
 ```
 
-**Iniciar:**
 ```bash
+# Iniciar tudo (App + FlareSolverr)
+docker compose up -d
+
+# Ou apenas FlareSolverr
 docker compose up -d flaresolverr
 ```
 
-**Docker CLI:**
+### Opcao 2: Docker CLI
+
 ```bash
 docker run -d \
   --name=flaresolverr \
@@ -110,13 +84,13 @@ docker run -d \
   ghcr.io/flaresolverr/flaresolverr:latest
 ```
 
-### 3. Verificar Instalação
+### Verificar Instalacao
 
 ```bash
 curl http://localhost:8191/health
 ```
 
-**Resposta esperada:**
+Resposta esperada:
 ```json
 {
   "status": "ok",
@@ -127,125 +101,64 @@ curl http://localhost:8191/health
 
 ---
 
-## Configuração no Manga-Kindle
+## Configuracao
 
-### Opção 1: Docker (Recomendado)
+### Docker (automatico)
 
-O `docker-compose.yml` já inclui FlareSolverr:
+Dentro do Docker Compose, o scraper usa `http://flaresolverr:8191/v1` automaticamente.
+
+### Desenvolvimento Local
+
+Defina a variavel de ambiente:
 
 ```bash
-# Iniciar tudo (API + Web + FlareSolverr)
-docker compose up -d
-
-# Verificar status
-docker compose ps
-```
-
-O scraper automaticamente usará `http://flaresolverr:8191/v1`.
-
-### Opção 2: Variável de Ambiente
-
-Se rodar fora do Docker, defina:
-
-**Linux/Mac:**
-```bash
-export FLARESOLVERR_URL=http://localhost:8191/v1
-```
-
-**Windows (PowerShell):**
-```powershell
-$env:FLARESOLVERR_URL="http://localhost:8191/v1"
-```
-
-**Windows (CMD):**
-```cmd
-set FLARESOLVERR_URL=http://localhost:8191/v1
-```
-
-**.env (Recomendado para desenvolvimento):**
-```env
 # .env na raiz do projeto
 FLARESOLVERR_URL=http://localhost:8191/v1
 ```
 
----
+Ou diretamente no shell:
 
-## Como Funciona no Código
+```bash
+# Linux/Mac
+export FLARESOLVERR_URL=http://localhost:8191/v1
 
-### BaseConnector com Fallback Automático
+# Windows (PowerShell)
+$env:FLARESOLVERR_URL="http://localhost:8191/v1"
 
-```typescript
-// packages/scraper/src/engine/base-connector.ts
-
-protected async fetchText(url: string): Promise<string> {
-  const response = await fetch(url, { headers: this.defaultHeaders });
-
-  // Se receber 403/503 (Cloudflare), tenta FlareSolverr
-  if (CF_STATUS_CODES.has(response.status)) {
-    return this.fetchTextViaCF(url);
-  }
-
-  return response.text();
-}
-
-private async fetchTextViaCF(url: string): Promise<string> {
-  if (!getFlareSolverrUrl()) {
-    throw new Error(
-      `HTTP 403/503 fetching ${url}. Site appears to be Cloudflare-protected. ` +
-      `Set FLARESOLVERR_URL env var to enable automatic bypass.`
-    );
-  }
-
-  // Chama FlareSolverr API
-  const result = await solveCloudflarePage(url);
-
-  // Cache cookies para próximas requisições
-  this.cacheCFCookies(url, result.cookies, result.userAgent);
-
-  return result.html;
-}
+# Windows (CMD)
+set FLARESOLVERR_URL=http://localhost:8191/v1
 ```
-
-### Cache de Cookies
-
-Após resolver Cloudflare uma vez, os cookies são cacheados:
-
-```typescript
-// Cookie cache por domínio
-private static cfCookieCache = new Map<
-  string, 
-  { cookies: string; userAgent: string; expires: number }
->();
-```
-
-**Vantagem:** Requisições subsequentes usam cookies cacheados sem chamar FlareSolverr novamente.
 
 ---
 
-## Sites que Precisam FlareSolverr
+## Sites que Podem Precisar de FlareSolverr
 
-| Site | Status | Notas |
-|------|--------|-------|
-| NineManga (PT) | ❌ 403 | Precisa FlareSolverr |
-| MangaKakalot | ❌ 403 | Precisa FlareSolverr |
-| Toonily | ❌ 403 | Precisa FlareSolverr |
-| Hiperdex | ⚠️ Instável | Às vezes precisa |
-| Luminous Scans | ⚠️ Timeout | Pode precisar |
-| MangaDex | ✅ OK | Sem Cloudflare |
-| AsuraScans | ✅ OK | Sem Cloudflare |
-| WeebCentral | ✅ OK | Sem Cloudflare |
+> **Nota:** O status de Cloudflare muda frequentemente. A tabela abaixo e uma referencia, nao uma verdade absoluta. O sistema detecta e tenta bypass automaticamente.
+
+| Categoria | Sites | Cloudflare? |
+|-----------|-------|-------------|
+| **Hand-written** | MangaDex | Nao (API oficial) |
+| | WeebCentral | Nao |
+| | MangaKakalot | Sim |
+| | AsuraScans | Variavel |
+| **MangaReaderCMS** | NineManga (PT/ES/EN) | Sim |
+| **WordPress Madara** | Toonily, Hiperdex | Variavel |
+| | Outros (87 sites) | Muitos usam CF |
+| **FlatManga** | Manganelo, Manganato | Variavel |
+| **Outros templates** | Depende do site | Verificar individualmente |
+
+**Na duvida:** Configure o FlareSolverr. Se o site nao precisa, ele nunca sera chamado (zero overhead).
 
 ---
 
 ## Troubleshooting
 
-### Erro: "Cannot connect to FlareSolverr"
+### "Cannot connect to FlareSolverr"
 
-**Causa:** FlareSolverr não está rodando ou URL errada.
+**Causa:** FlareSolverr nao esta rodando ou URL errada.
 
-**Solução:**
 ```bash
-# Verificar se container está rodando
+# Verificar se container esta rodando
 docker ps | grep flaresolverr
 
 # Ver logs
@@ -255,168 +168,58 @@ docker logs flaresolverr
 docker restart flaresolverr
 ```
 
-### Erro: "Cloudflare challenge timeout"
+### "Cloudflare challenge timeout"
 
 **Causa:** Cloudflare demorou mais que 60s para resolver.
 
-**Solução:**
-1. Aumente timeout no `flaresolverr.ts`:
-```typescript
-const timeout = 90000; // 90s ao invés de 60s
-```
+Solucoes:
+1. Reiniciar FlareSolverr: `docker restart flaresolverr`
+2. Verificar se IP nao esta bloqueado
+3. Atualizar FlareSolverr: `docker pull ghcr.io/flaresolverr/flaresolverr:latest`
 
-2. Verifique se site não está bloqueando seu IP
+### FlareSolverr nao resolve
 
-### Erro: "Infinite loop" no Cloudflare
+**Causa:** Cloudflare atualizou protecao.
 
-**Causa:** Site detectou comportamento de bot.
+Solucoes:
+1. Atualizar FlareSolverr para versao mais recente
+2. Verificar issues: https://github.com/FlareSolverr/FlareSolverr/issues
+3. Reiniciar container (limpa sessoes antigas)
 
-**Solução:**
-1. Limpe cookies do FlareSolverr:
-```bash
-docker restart flaresolverr
-```
+### Site retorna HTML mas scraper falha
 
-2. Troque IP (VPN ou aguarde)
+**Causa:** Site mudou estrutura HTML, nao e problema de Cloudflare.
 
-3. Site pode ter bloqueio permanente
-
-### FlareSolverr não resolve
-
-**Causa:** Cloudflare atualizou proteção.
-
-**Solução:**
-1. Atualize FlareSolverr:
-```bash
-docker pull ghcr.io/flaresolverr/flaresolverr:latest
-docker restart flaresolverr
-```
-
-2. Verifique issues: https://github.com/FlareSolverr/FlareSolverr/issues
+Solucao: Verificar seletores CSS no template correspondente.
 
 ---
 
-## Performance e Recursos
+## Performance
 
-### Consumo de Memória
+| Metrica | Valor |
+|---------|-------|
+| RAM por request | ~200-500MB (Chrome headless) |
+| Tempo de resolucao | 2-10s por desafio |
+| Cache de cookies | 15 minutos por dominio |
+| Overhead quando nao precisa | Zero (so chamado em 403/503) |
 
-Cada requisição ao FlareSolverr:
-- **~200-500MB RAM** por instância Chrome
-- **2-10s** para resolver desafio
-- **Concorrência limitada** (não faça 100 requests de uma vez)
+### Boas Praticas
 
-### Otimizações
-
-1. **Cache de cookies** já implementado
-2. **Timeout de 60s** evita espera infinita
-3. **Fallback automático** só quando necessário
-
-### Boas Práticas
-
-```typescript
-// ❌ RUIM: Muitas requests simultâneas
-await Promise.all(
-  chapters.map(ch => connector.getPages(ch.id)) // 100 requests!
-);
-
-// ✅ BOM: Processamento em lote
-for (const chapter of chapters) {
-  const pages = await connector.getPages(chapter.id);
-  await delay(1000); // 1s entre requests
-}
-```
+- **Nao faca muitas requests simultaneas** ao FlareSolverr
+- O download service ja limita concorrencia (4 paginas simultaneas)
+- Cookies cacheados evitam chamadas repetidas ao FlareSolverr
+- Rate limiting configuravel via `RATE_LIMIT_MS`
 
 ---
 
-## Alternativas ao FlareSolverr
-
-### 1. HaruNeko (Recomendado pelo HakuNeko)
-
-Sucessor do HakuNeko com melhor suporte a Cloudflare:
-- https://github.com/harunko/HaruNeko
-
-### 2. Browser Automation
-
-Usar Puppeteer/Playwright diretamente:
-```typescript
-import puppeteer from 'puppeteer';
-
-const browser = await puppeteer.launch({ headless: true });
-const page = await browser.newPage();
-await page.goto('https://site.com');
-const html = await page.content();
-```
-
-**Desvantagens:**
-- Mais complexo
-- Mais pesado
-- Requer manutenção
-
-### 3. API Alternativa
-
-Alguns sites têm APIs não protegidas:
-```typescript
-// Exemplo: MangaDex API
-const api = 'https://api.mangadex.org/manga';
-```
-
----
-
-## Monitoramento
-
-### Health Check Automático
-
-Script incluído detecta sites com Cloudflare:
-
-```bash
-npm run health-check --workspace=packages/scraper
-```
-
-**Saída:**
-```
-🚫 CLOUDFLARE: MangaKakalot, NineManga, Toonily
-⚠️  SLOW: Luminous Scans
-✅ OK: MangaDex, AsuraScans, WeebCentral
-```
-
-### Logs do FlareSolverr
-
-```bash
-# Ver em tempo real
-docker logs -f flaresolverr
-
-# Últimas 100 linhas
-docker logs --tail 100 flaresolverr
-```
-
----
-
-## Referências
+## Referencias
 
 - **FlareSolverr GitHub:** https://github.com/FlareSolverr/FlareSolverr
-- **HakuNeko Issues:** https://github.com/manga-download/hakuneko/issues
-- **Cloudflare Challenge:** https://www.cloudflare.com/ddos/
+- **Decisao tecnica (Puppeteer vs FlareSolverr):** [docs/puppeteer-vs-flaresolverr.md](puppeteer-vs-flaresolverr.md)
+- **Estrategia de conectores:** [docs/connector-strategy.md](connector-strategy.md)
 
 ---
 
-## Resumo Rápido
-
-```bash
-# 1. Instalar Docker
-# 2. Rodar FlareSolverr
-docker compose up -d flaresolverr
-
-# 3. Verificar
-curl http://localhost:8191/health
-
-# 4. Usar scraper
-npm run dev
-
-# Sites com 403 agora funcionam automaticamente! ✅
-```
-
----
-
-**Última atualização:** Março 2026  
-**Versão FlareSolverr:** 3.3.x  
+**Ultima atualizacao:** Marco 2026
+**Versao FlareSolverr:** 3.3.x
 **Testado em:** Windows 11, Ubuntu 22.04, Docker 24.x

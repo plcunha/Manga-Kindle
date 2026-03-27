@@ -101,7 +101,7 @@ export default function SearchPage() {
         >
           {sources.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name}
+              {s.cloudflareProtected ? `[CF] ${s.name}` : s.name}
             </option>
           ))}
           {sources.length === 0 && (
@@ -127,6 +127,15 @@ export default function SearchPage() {
           {loading ? "Searching..." : "Search"}
         </button>
       </form>
+
+      {/* Cloudflare warning */}
+      {sources.find((s) => s.id === sourceId)?.cloudflareProtected && (
+        <p className="mb-4 rounded-lg border border-yellow-800/40 bg-yellow-900/20 px-4 py-3 text-sm text-yellow-400">
+          This source is protected by Cloudflare. It requires{" "}
+          <strong>FlareSolverr</strong> to work. Check the settings page to
+          configure it.
+        </p>
+      )}
 
       {/* Error */}
       {error && (
