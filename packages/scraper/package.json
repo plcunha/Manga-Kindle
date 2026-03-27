@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "test": "echo \"no tests yet\""
+    "test": "echo \"no tests yet\"",
+    "health-check": "tsx scripts/health-check.ts",
+    "sync-hakuneko": "tsx scripts/sync-hakuneko.ts"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
