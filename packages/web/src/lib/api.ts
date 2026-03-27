@@ -93,8 +93,9 @@ export interface DeviceProfile {
 
 // ── Sources ────────────────────────────────────────────
 
-export function getSources(): Promise<Source[]> {
-  return request<{ sources: Source[] }>("/sources").then((r) => r.sources);
+export function getSources(language?: string): Promise<{ sources: Source[]; languages: string[] }> {
+  const params = language ? `?language=${encodeURIComponent(language)}` : "";
+  return request<{ sources: Source[]; languages: string[] }>(`/sources${params}`);
 }
 
 export function getSource(id: string): Promise<Source> {

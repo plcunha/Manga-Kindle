@@ -87,10 +87,11 @@ export class ScraperEngine {
 
 // --- Singleton engine with all connectors registered ---
 
-import { MangaDexConnector } from './connectors/mangadex.js';
-import { MangaSeeConnector } from './connectors/mangasee.js';
-import { MangaKakalotConnector } from './connectors/mangakakalot.js';
-import { WPMangastreamConnector } from './templates/wordpress-mangastream.js';
+ import { MangaDexConnector } from './connectors/mangadex.js';
+ import { MangaSeeConnector } from './connectors/mangasee.js';
+ import { MangaKakalotConnector } from './connectors/mangakakalot.js';
+ import { AsuraScansConnector } from './connectors/asurascans.js';
+ import { WPMangastreamConnector } from './templates/wordpress-mangastream.js';
 import { WPMadaraConnector } from './templates/wordpress-madara.js';
 import { FoolSlideConnector } from './templates/foolslide.js';
 import { MadThemeConnector } from './templates/madtheme.js';
@@ -107,10 +108,11 @@ import { genkanSites } from './sites/genkan-sites.js';
 
 export const engine = new ScraperEngine();
 
-// Register hand-written connectors
-engine.register(new MangaDexConnector());
-engine.register(new MangaSeeConnector());
-engine.register(new MangaKakalotConnector());
+ // Register hand-written connectors
+ engine.register(new MangaDexConnector());
+ engine.register(new MangaSeeConnector());
+ engine.register(new MangaKakalotConnector());
+ engine.register(new AsuraScansConnector());
 
 // Register all WordPressMangastream template sites
 for (const site of wpMangastreamSites) {
@@ -147,11 +149,13 @@ for (const site of genkanSites) {
   engine.register(new GenkanConnector(site));
 }
 
-// Re-export connectors and templates
-export { MangaDexConnector } from './connectors/mangadex.js';
-export { MangaSeeConnector } from './connectors/mangasee.js';
-export { MangaKakalotConnector } from './connectors/mangakakalot.js';
+ // Re-export connectors and templates
+ export { MangaDexConnector } from './connectors/mangadex.js';
+ export { MangaSeeConnector } from './connectors/mangasee.js';
+ export { MangaKakalotConnector } from './connectors/mangakakalot.js';
+ export { AsuraScansConnector } from './connectors/asurascans.js';
 export { BaseConnector } from './engine/base-connector.js';
+export { solveCloudflarePage, isFlareSolverrAvailable, getFlareSolverrUrl } from './engine/flaresolverr.js';
 export { WPMangastreamConnector } from './templates/wordpress-mangastream.js';
 export { WPMadaraConnector } from './templates/wordpress-madara.js';
 export { FoolSlideConnector } from './templates/foolslide.js';

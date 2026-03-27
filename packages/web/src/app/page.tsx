@@ -4,22 +4,55 @@ import { useState, useEffect } from "react";
 import { getSources, searchManga, type Source, type MangaInfo } from "@/lib/api";
 import { MangaCard } from "@/components/manga-card";
 
+/** Human-friendly language names for ISO 639-1 codes */
+const LANG_LABELS: Record<string, string> = {
+  en: "English",
+  ja: "Japanese",
+  ko: "Korean",
+  zh: "Chinese",
+  pt: "Portuguese",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  it: "Italian",
+  ru: "Russian",
+  ar: "Arabic",
+  th: "Thai",
+  vi: "Vietnamese",
+  id: "Indonesian",
+  tr: "Turkish",
+  pl: "Polish",
+  nl: "Dutch",
+  multi: "Multi-language",
+};
+
 export default function SearchPage() {
   const [sources, setSources] = useState<Source[]>([]);
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [langFilter, setLangFilter] = useState("");
   const [sourceId, setSourceId] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MangaInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Load sources (re-fetch when language filter changes)
   useEffect(() => {
-    getSources()
-      .then((s) => {
+    getSources(langFilter || undefined)
+      .then(({ sources: s, languages: langs }) => {
         setSources(s);
-        if (s.length > 0) setSourceId(s[0].id);
+        setLanguages(langs);
+        // Keep current selection if still in list, otherwise pick first
+        if (s.length > 0) {
+          const stillExists = s.find((src) => src.id === sourceId);
+          if (!stillExists) setSourceId(s[0].id);
+        } else {
+          setSourceId("");
+        }
       })
       .catch(() => setError("Failed to load sources. Is the API running?"));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [langFilter]);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -45,7 +78,22 @@ export default function SearchPage() {
       <h1 className="mb-6 text-2xl font-bold">Search Manga</h1>
 
       {/* Search Form */}
-      <form onSubmit={handleSearch} className="mb-8 flex gap-3">
+      <form onSubmit={handleSearch} className="mb-8 flex flex-wrap gap-3">
+        {/* Language filter */}
+        <select
+          value={langFilter}
+          onChange={(e) => setLangFilter(e.target.value)}
+          className="rounded-lg border border-surface-200 bg-surface-100 px-3 py-2 text-sm text-gray-200 focus:border-accent focus:outline-none"
+        >
+          <option value="">All languages ({languages.length})</option>
+          {languages.map((lang) => (
+            <option key={lang} value={lang}>
+              {LANG_LABELS[lang] || lang}
+            </option>
+          ))}
+        </select>
+
+        {/* Source selector */}
         <select
           value={sourceId}
           onChange={(e) => setSourceId(e.target.value)}
@@ -56,6 +104,11 @@ export default function SearchPage() {
               {s.name}
             </option>
           ))}
+          {sources.length === 0 && (
+            <option value="" disabled>
+              No sources
+            </option>
+          )}
         </select>
 
         <input

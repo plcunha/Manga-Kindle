@@ -16,10 +16,30 @@ function mapSource(s: Source) {
 }
 
 // GET /api/sources - List all available manga/anime sources
-sourcesRouter.get('/', async (_req, res) => {
-  const sources = engine.getSources();
-  res.json({ sources: sources.map(mapSource) });
+// Query params:
+//   ?language=en,pt  — filter by language (comma-separated ISO 639-1 codes)
+sourcesRouter.get('/', async (req, res) => {
+  let sources = engine.getSources();
+
+  const langParam = req.query.language;
+  if (typeof langParam === 'string' && langParam.trim()) {
+    const langs = new Set(
+      langParam.split(',').map((l) => l.trim().toLowerCase()).filter(Boolean),
+    );
+    sources = sources.filter((s) => langs.has(s.language.toLowerCase()));
+  }
+
+  res.json({
+    sources: sources.map(mapSource),
+    languages: getAvailableLanguages(),
+  });
 });
+
+/** Returns sorted list of unique languages across all registered sources */
+function getAvailableLanguages(): string[] {
+  const langs = new Set(engine.getSources().map((s) => s.language));
+  return [...langs].sort();
+}
 
 // GET /api/sources/:id - Get source details
 sourcesRouter.get('/:id', async (req, res) => {

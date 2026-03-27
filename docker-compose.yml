@@ -19,6 +19,21 @@ services:
       - KCC_PATH=/usr/bin/kcc-c2e
       - KCC_DEVICE_PROFILE=KPW5
       - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+    depends_on:
+      - flaresolverr
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=America/Sao_Paulo
+    ports:
+      - "8191:8191"
     restart: unless-stopped
 
 volumes:
