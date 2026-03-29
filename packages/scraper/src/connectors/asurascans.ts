@@ -2,31 +2,7 @@ import { BaseConnector } from '../engine/base-connector.js';
 import { load } from 'cheerio';
 import type { MangaInfo, ChapterInfo, PageInfo, Source } from '../index.js';
 
-interface AsuraSeries {
-  id: number;
-  slug: string;
-  title: string;
-  alt_titles?: string[];
-  description?: string;
-  cover: string;
-  banner?: string;
-  status: 'ongoing' | 'completed' | 'hiatus' | 'dropped';
-  type: 'manhwa' | 'manga' | 'manhua';
-  author?: string;
-  artist?: string;
-  release_year?: number;
-  popularity_rank: number;
-  bookmark_count: number;
-  rating: number;
-  chapter_count: number;
-  last_chapter_at: string;
-  genres?: { id: number; name: string; slug: string }[];
-  latest_chapters?: { id: number; number: number; title?: string; slug: string; published_at: string }[];
-  public_url: string;
-  source_url: string;
-}
-
- export class AsuraScansConnector extends BaseConnector {
+export class AsuraScansConnector extends BaseConnector {
   readonly source: Source = {
     id: 'asurascans',
     name: 'Asura Scans',
@@ -38,219 +14,189 @@ interface AsuraSeries {
 
   private readonly baseUrl = 'https://asurascans.com';
 
-  private extractSeriesFromHtml(html: string): AsuraSeries[] | null {
-    try {
-      // Look for embedded JSON in the HTML (Astro passes data via props)
-      // Format: "initialSeries":[1,[[0,{...series data...}]]]
-      const seriesMatch = html.match(/"initialSeries":\[1,\[\[0,({[\s\S]*?"source_url":[\s\S]*?"\/s\/\d+"})\]/);
-      if (seriesMatch) {
-        const series = JSON.parse(seriesMatch[1]) as AsuraSeries;
-        return [series];
-      }
-      
-      // Try to find series data in browse page format (multiple series)
-      const browseMatch = html.match(/"initialSeries":\[1,\[([\s\S]*?)\]\]/);
-      if (browseMatch) {
-        const seriesData = browseMatch[1];
-        const series: AsuraSeries[] = [];
-        
-        // Extract individual series objects from the nested array structure
-        const objMatches = seriesData.match(/\[0,({[\s\S]*?"source_url":[\s\S]*?"\/s\/\d+"})\]/g);
-        if (objMatches) {
-          for (const objMatch of objMatches) {
-            const innerMatch = objMatch.match(/\[0,({[\s\S]*})\]/);
-            if (innerMatch) {
-              try {
-                series.push(JSON.parse(innerMatch[1]));
-              } catch {
-                // Skip invalid entries
-              }
-            }
-          }
-        }
-        
-        if (series.length > 0) {
-          return series;
-        }
-      }
-      
-      return null;
-    } catch {
-      return null;
-    }
+  /**
+   * Extract series cards from a browse page using cheerio.
+   *
+   * AsuraScans uses Astro v5 which embeds data in HTML entities, but the
+   * actual <a href="/comics/{slug-hash}"> links with <img alt="Title"> are
+   * rendered in the HTML and parseable with cheerio.
+   */
+  private extractSeriesFromPage(html: string): MangaInfo[] {
+    const $ = load(html);
+    const results: MangaInfo[] = [];
+
+    $('a[href*="/comics/"]').each((_, el) => {
+      const href = $(el).attr('href');
+      if (!href) return;
+
+      const match = href.match(/\/comics\/([a-z0-9][a-z0-9-]+)/);
+      if (!match) return;
+
+      const slugHash = match[1];
+
+      // Get title from img alt attribute (most reliable) or link text
+      const title =
+        $(el).find('img').attr('alt')?.trim() ||
+        $(el).text().trim();
+      const cover =
+        $(el).find('img').attr('src') ||
+        $(el).find('img').attr('data-src') ||
+        undefined;
+
+      if (!title || results.some((r) => r.id === slugHash)) return;
+
+      results.push({
+        id: slugHash,
+        sourceId: this.source.id,
+        title,
+        url: `${this.baseUrl}/comics/${slugHash}`,
+        cover,
+        status: 'unknown',
+      });
+    });
+
+    return results;
   }
 
   async search(query: string): Promise<MangaInfo[]> {
-    // AsuraScans doesn't have a direct search API exposed in HTML
-    // We'll use the browse page and filter client-side
-    const html = await this.fetchText(`${this.baseUrl}/browse`);
-    const series = this.extractSeriesFromHtml(html);
-    
-    if (!series || series.length === 0) {
-      return [];
-    }
+    // AsuraScans supports server-side search via browse?q= parameter
+    const searchUrl = query
+      ? `${this.baseUrl}/browse?q=${encodeURIComponent(query)}`
+      : `${this.baseUrl}/browse`;
 
-    // Filter by query if provided
-    const results = query
-      ? series.filter(s => 
-          s.title.toLowerCase().includes(query.toLowerCase()) ||
-          s.alt_titles?.some(t => t.toLowerCase().includes(query.toLowerCase()))
-        )
-      : series;
-
-    return results.map(s => ({
-      id: s.id.toString(),
-      sourceId: this.source.id,
-      title: s.title,
-      url: `${this.source.url}${s.public_url}`,
-      cover: s.cover,
-      synopsis: s.description ? this.cleanHtml(s.description) : undefined,
-      authors: [s.author, s.artist].filter(Boolean) as string[],
-      genres: s.genres?.map(g => g.name) || [],
-      status: this.mapStatus(s.status),
-    }));
+    const html = await this.fetchText(searchUrl);
+    return this.extractSeriesFromPage(html);
   }
 
   async getManga(id: string): Promise<MangaInfo | null> {
-    // Fetch the manga page
-    const html = await this.fetchText(`${this.source.url}/comics/${id}`);
-    const $ = load(html);
-    
-    // Extract data from embedded JSON first
-    const series = this.extractSeriesFromHtml(html);
-    if (series && series.length > 0) {
-      const s = series[0];
-      return {
-        id: s.id.toString(),
-        sourceId: this.source.id,
-        title: s.title,
-        url: `${this.source.url}${s.public_url}`,
-        cover: s.cover,
-        synopsis: s.description ? this.cleanHtml(s.description) : undefined,
-        authors: [s.author, s.artist].filter(Boolean) as string[],
-        genres: s.genres?.map(g => g.name) || [],
-        status: this.mapStatus(s.status),
-      };
+    const url = `${this.baseUrl}/comics/${id}`;
+
+    let html: string;
+    try {
+      html = await this.fetchText(url);
+    } catch (err: unknown) {
+      // Only swallow 404 — re-throw network / rate-limit / 5xx errors
+      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
+        return null;
+      }
+      throw err;
     }
 
-    // Fallback: parse from HTML
+    const $ = load(html);
+
     const title = $('h1').first().text().trim();
-    const description = $('#description-text').text().trim() || 
-                       $('meta[property="og:description"]').attr('content') || 
-                       '';
-    const cover = $('meta[property="og:image"]').attr('content') || 
-                  $('.rounded-lg.overflow-hidden img').first().attr('src') || '';
-    
-    // Extract genres
+    if (!title) return null;
+
+    const description =
+      $('meta[property="og:description"]').attr('content') ||
+      $('meta[name="description"]').attr('content') ||
+      '';
+
+    const cover =
+      $('meta[property="og:image"]').attr('content') ||
+      '';
+
+    // Extract genres from browse-style links
     const genres: string[] = [];
     $('a[href*="/browse?genres="]').each((_, el) => {
       const genre = $(el).text().trim();
       if (genre) genres.push(genre);
     });
 
-    if (!title) return null;
-
     return {
       id,
       sourceId: this.source.id,
       title,
-      url: `${this.source.url}/comics/${id}`,
+      url,
       cover: cover || undefined,
-      synopsis: description || undefined,
-      genres,
+      synopsis: description ? this.cleanHtml(description) : undefined,
+      genres: genres.length > 0 ? genres : undefined,
     };
   }
 
   async getChapters(mangaId: string): Promise<ChapterInfo[]> {
-    const html = await this.fetchText(`${this.source.url}/comics/${mangaId}`);
+    const html = await this.fetchText(`${this.baseUrl}/comics/${mangaId}`);
     const $ = load(html);
     const chapters: ChapterInfo[] = [];
+    const seen = new Set<number>();
 
-    // Parse chapter list from HTML
-    const chapterLinks = $('a[href*="/chapter/"]');
-    chapterLinks.each((_, el) => {
+    // Select chapter links — format: /comics/{slug-hash}/chapter/{num}
+    $('a[href*="/chapter/"]').each((_, el) => {
       const href = $(el).attr('href');
       if (!href) return;
 
-      const chapterNum = parseFloat(href.match(/chapter\/(\d+)/)?.[1] || '0');
-      if (!chapterNum) return;
+      const numMatch = href.match(/\/chapter\/(\d+)/);
+      if (!numMatch) return;
 
-      const chapterTitle = $(el).text().trim() || `Chapter ${chapterNum}`;
-      const timeAgo = $(el).find('time').text().trim();
+      const chapterNum = parseFloat(numMatch[1]);
+      // Skip duplicate chapter numbers (the page has "First Chapter" / "Latest Chapter" links)
+      if (seen.has(chapterNum)) return;
+      seen.add(chapterNum);
+
+      const rawText = $(el).text().trim();
+      // Clean up text like "Chapter 2Jul 26, 2022" → "Chapter 2"
+      const chapterTitle =
+        rawText
+          .replace(
+            /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s*\d{4}.*$/,
+            '',
+          )
+          .trim() || `Chapter ${chapterNum}`;
+
+      // Extract date if embedded in the text
+      const dateMatch = rawText.match(
+        /((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s*\d{4})/,
+      );
 
       chapters.push({
-        id: href,
+        id: href.startsWith('/') ? href : `/${href}`,
         mangaId,
         title: chapterTitle,
         number: chapterNum,
         language: 'en',
-        url: `${this.source.url}${href}`,
-        date: timeAgo || undefined,
+        url: `${this.baseUrl}${href.startsWith('/') ? href : `/${href}`}`,
+        date: dateMatch ? dateMatch[1] : undefined,
       });
     });
 
-    // Sort chapters in descending order (newest first)
+    // Sort descending (newest first)
     chapters.sort((a, b) => b.number - a.number);
-
     return chapters;
   }
 
   async getPages(chapterId: string): Promise<PageInfo[]> {
-    const html = await this.fetchText(chapterId);
-    const $ = load(html);
-    const pages: PageInfo[] = [];
+    // chapterId is a path like /comics/{slug-hash}/chapter/{num}
+    const url = chapterId.startsWith('http')
+      ? chapterId
+      : `${this.baseUrl}${chapterId}`;
+    const html = await this.fetchText(url);
 
-    // Look for chapter images
-    const images = $('main img, article img, .chapter-content img, .reading-content img');
-    
-    let imageIndex = 0;
-    images.each((i, el) => {
-      const src = $(el).attr('src');
-      if (!src) return;
-      
-      // Skip non-chapter images (logos, covers, etc.)
-      if (src.includes('logo') || src.includes('cover') || src.includes('avatar') || src.includes('banner')) {
-        return;
-      }
-      
-      // Only include images that look like chapter pages
-      if (src.includes('asura-images') || src.includes('chapters') || src.includes('cdn.asurascans.com')) {
-        pages.push({
-          index: imageIndex++,
-          url: src.startsWith('http') ? src : `${this.source.url}${src}`,
-          referer: chapterId,
-        });
-      }
+    // AsuraScans embeds chapter images inside Astro serialization in the HTML.
+    // Standard cheerio <img> parsing only finds ~2 visible images.
+    // The real image URLs are in the raw HTML matching the CDN pattern:
+    //   https://cdn.asurascans.com/asura-images/chapters/{slug}/{chapter}/{filename}.webp
+    const imageRegex =
+      /https?:\/\/cdn\.asurascans\.com\/asura-images\/chapters\/[^\s"'&<>]+\.(?:webp|jpg|png|jpeg)/gi;
+    const matches = html.match(imageRegex) || [];
+
+    // Deduplicate and preserve order
+    const uniqueUrls = [...new Set(matches)];
+
+    // Sort by filename to ensure correct page order (001.webp, 002.webp, ...)
+    uniqueUrls.sort((a, b) => {
+      const fileA = a.split('/').pop() || '';
+      const fileB = b.split('/').pop() || '';
+      return fileA.localeCompare(fileB, undefined, { numeric: true });
     });
 
-    // If no images found with specific patterns, try all images in content areas
-    if (pages.length === 0) {
-      $('img').each((i, el) => {
-        const src = $(el).attr('src');
-        if (!src) return;
-        
-        // Skip UI images
-        if (src.includes('logo') || src.includes('cover') || src.includes('avatar') || 
-            src.includes('banner') || src.includes('icon') || src.includes('placeholder')) {
-          return;
-        }
-        
-        // Include images that look like they could be chapter pages
-        if (src.includes('asura-images') || src.includes('cdn.asurascans.com')) {
-          pages.push({
-            index: imageIndex++,
-            url: src.startsWith('http') ? src : `${this.source.url}${src}`,
-            referer: chapterId,
-          });
-        }
-      });
-    }
-
-    return pages;
+    return uniqueUrls.map((imgUrl, index) => ({
+      index,
+      url: imgUrl,
+      referer: url,
+    }));
   }
 
   private cleanHtml(html: string): string {
-    // Remove HTML tags and decode entities
     return html
       .replace(/<[^>]*>/g, '')
       .replace(/&nbsp;/g, ' ')
@@ -260,18 +206,5 @@ interface AsuraSeries {
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
       .trim();
-  }
-
-  private mapStatus(status: string): 'ongoing' | 'completed' | 'hiatus' | 'unknown' {
-    switch (status.toLowerCase()) {
-      case 'ongoing':
-        return 'ongoing';
-      case 'completed':
-        return 'completed';
-      case 'hiatus':
-        return 'hiatus';
-      default:
-        return 'unknown';
-    }
   }
 }

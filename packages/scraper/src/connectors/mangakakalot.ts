@@ -29,6 +29,7 @@ export class MangaKakalotConnector extends BaseConnector {
     language: 'en',
     type: 'manga',
     enabled: true,
+    cloudflareProtected: true,
   };
 
   async search(query: string): Promise<MangaInfo[]> {
@@ -164,8 +165,12 @@ export class MangaKakalotConnector extends BaseConnector {
         genres: genres.length > 0 ? genres : undefined,
         status,
       };
-    } catch {
-      return null;
+    } catch (err: unknown) {
+      // Only swallow 404 — re-throw network / rate-limit / 5xx errors
+      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
+        return null;
+      }
+      throw err;
     }
   }
 

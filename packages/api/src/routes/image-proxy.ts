@@ -34,6 +34,10 @@ const ALLOWED_DOMAINS = [
   // MangaSee CDNs
   'temp.compsci88.com',
   'official-ongoing-2.gcdn.co',
+  // WeebCentral (MangaSee) chapter images CDN
+  'hot.planeptune.us',
+  // AsuraScans chapter images CDN
+  'cdn.asurascans.com',
   // MangaDex CDNs
   'uploads.mangadex.org',
   'mangadex.network',        // at-home CDN (e.g. cmdxd98sb0x3yprd.mangadex.network)
@@ -76,6 +80,10 @@ imageProxyRouter.get('/', async (req, res) => {
       referer = 'https://www.manganato.gg';
     } else if (parsed.hostname.includes('chapmanganato')) {
       referer = 'https://www.manganato.gg';
+    } else if (parsed.hostname.includes('planeptune')) {
+      referer = 'https://weebcentral.com';
+    } else if (parsed.hostname.includes('asurascans')) {
+      referer = 'https://asurascans.com';
     }
 
     const upstream = await fetch(imageUrl, {
